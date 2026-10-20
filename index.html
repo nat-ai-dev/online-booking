@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Онлайн-запись — студия красоты</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          accent: { DEFAULT: '#ec4899', dark: '#db2777', soft: '#fdf2f8' },
+          ink: '#1f2937'
+        },
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { -webkit-font-smoothing: antialiased; }
+  .fade-up { animation: fadeUp .38s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .pop { animation: pop .5s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes pop { 0% { opacity: 0; transform: scale(.92); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+  .check-draw { stroke-dasharray: 34; stroke-dashoffset: 34; animation: draw .55s .18s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  ::selection { background: #ec4899; color: #fff; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body class="font-sans bg-[#fafafa] text-[#1f2937] antialiased">
+
+<main class="min-h-screen px-4 py-6 sm:py-10">
+  <div class="mx-auto w-full max-w-3xl">
+
+    <div id="app" class="bg-white rounded-[12px] border border-gray-100 shadow-[0_10px_34px_rgba(31,41,55,0.07)] overflow-hidden">
+      <header class="px-5 sm:px-8 pt-7 pb-5 sm:pt-8">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Онлайн-запись</h1>
+            <p class="mt-1.5 text-sm sm:text-base text-gray-500">Выберите услугу, мастера и удобное время</p>
+          </div>
+          <span class="hidden sm:inline-flex items-center gap-2 shrink-0 rounded-full bg-[#fdf2f8] px-3 py-1.5 text-xs font-semibold text-[#ec4899]">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#ec4899]"></span> Свободные окна
+          </span>
+        </div>
+      </header>
+
+      <div id="stepper" class="px-5 sm:px-8 pb-5"></div>
+
+      <div class="h-1 w-full bg-gray-100">
+        <div id="progress" class="h-full w-0 rounded-r-full bg-[#ec4899] transition-[width] duration-500 ease-out"></div>
+      </div>
+
+      <section id="panels" class="px-5 sm:px-8 py-6 sm:py-7 min-h-[330px]"></section>
+
+      <footer id="nav" class="border-t border-gray-100 bg-gray-50/70 px-5 sm:px-8 py-5"></footer>
+    </div>
+
+    <p class="mt-4 text-center text-xs text-gray-400">Студия красоты «Форма» · ул. Ленина, 12 · +7 (495) 000-00-00</p>
+  </div>
+</main>
+
+<script>
+/* ============================ данные ============================ */
+const ICONS = {
+  scissors: '<path d="M6 4l12 12M18 4L6 16"/><circle cx="6" cy="19" r="3"/><circle cx="18" cy="19" r="3"/>',
+  user:     '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  droplet:  '<path d="M12 2.7l5.2 5.2a7.4 7.4 0 1 1-10.4 0z"/>',
+  hand:     '<path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-2a2 2 0 1 1 4 0"/>',
+  sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M18.4 15.4l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/>',
+  wind:     '<path d="M3 8h9a3 3 0 1 0-3-3"/><path d="M3 16h12a3 3 0 1 1-3 3"/><path d="M3 12h18"/>',
+  star:     '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>'
+};
+
+const SERVICES = [
+  { id: 'cut-f',  name: 'Стрижка женская', price: 2500, mins: 60,  icon: 'scissors' },
+  { id: 'cut-m',  name: 'Стрижка мужская', price: 1500, mins: 45,  icon: 'user' },
+  { id: 'color',  name: 'Окрашивание',     price: 4500, mins: 120, icon: 'droplet' },
+  { id: 'mani',   name: 'Маникюр',         price: 1800, mins: 60,  icon: 'hand' },
+  { id: 'pedi',   name: 'Педикюр',         price: 2200, mins: 75,  icon: 'sparkles' },
+  { id: 'style',  name: 'Укладка',         price: 1500, mins: 45,  icon: 'wind' }
+];
+
+const MASTERS = [
+  { id: 'anna',  name: 'Анна',            role: 'стилист',       rating: '4.9', initials: 'А', grad: 'from-pink-400 to-rose-500' },
+  { id: 'maria', name: 'Мария',           role: 'колорист',      rating: '4.8', initials: 'М', grad: 'from-violet-400 to-fuchsia-500' },
+  { id: 'elena', name: 'Елена',           role: 'мастер маникюра', rating: '5.0', initials: 'Е', grad: 'from-amber-400 to-orange-500' },
+  { id: 'any',   name: 'Любой свободный', role: 'подберём мастера', rating: null, initials: '★', grad: 'from-slate-300 to-slate-400' }
+];
+
+const SLOTS = ['10:00', '11:30', '13:00', '14:30', '16:00', '17:30'];
+
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+const CAL = { year: 2026, month: 9 };            // октябрь 2026
+const DAYS_IN_MONTH = new Date(CAL.year, CAL.month + 1, 0).getDate();
+
+/* «сегодня»: реальная дата, если она внутри октября 2026, иначе 15 октября 2026 */
+const realNow = new Date();
+const TODAY = (realNow.getFullYear() === CAL.year && realNow.getMonth() === CAL.month)
+  ? realNow
+  : new Date(CAL.year, CAL.month, 15);
+
+const state = { step: 1, service: null, master: null, day: null, slot: null, name: '', phone: '' };
+
+/* ============================ утилиты ============================ */
+const $ = (sel) => document.querySelector(sel);
+const money = (n) => n.toLocaleString('ru-RU') + ' ₽';
+const byId = (arr, id) => arr.find(x => x.id === id) || null;
+const pad = (n) => String(n).padStart(2, '0');
+
+function dateKey(d) { return CAL.year + '-' + pad(CAL.month + 1) + '-' + pad(d); }
+function isPast(d) { return d < TODAY.getDate(); }
+function isToday(d) { return d === TODAY.getDate(); }
+function dateLabel(d) { return d + ' ' + MONTHS_GEN[CAL.month] + ' ' + CAL.year; }
+function slotMinutes(i) { const [h, m] = SLOTS[i].split(':').map(Number); return h * 60 + m; }
+
+function isBusy(d, i) {
+  if (isToday(d) && slotMinutes(i) <= (TODAY.getHours() * 60 + TODAY.getMinutes())) return true;
+  return ((d * 7 + i * 11) % 5 === 0) || (d % 6 === 0 && i === 4);
+}
+function busyCount(d) { let n = 0; for (let i = 0; i < SLOTS.length; i++) if (isBusy(d, i)) n++; return n; }
+
+function phoneDigits(v) {
+  let d = String(v).replace(/\D/g, '');
+  if (d.length > 10 && (d[0] === '7' || d[0] === '8')) d = d.slice(1);
+  return d.slice(0, 10);
+}
+function formatPhone(d) {
+  if (!d) return '';
+  let out = '+7';
+  if (d.length) out += ' (' + d.slice(0, 3);
+  if (d.length >= 3) out += ')';
+  if (d.length > 3) out += ' ' + d.slice(3, 6);
+  if (d.length > 6) out += '-' + d.slice(6, 8);
+  if (d.length > 8) out += '-' + d.slice(8, 10);
+  return out;
+}
+
+const svg = (path, cls, w) =>
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 1.8) +
+  '" stroke-linecap="round" stroke-linejoin="round" class="' + cls + '">' + path + '</svg>';
+
+const checkSmall = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M20 6L9 17l-5-5"/></svg>';
+
+/* ============================ шапка шагов ============================ */
+const STEP_LABELS = ['Услуга', 'Мастер', 'Время', 'Данные'];
+
+function renderStepper() {
+  const parts = [];
+  for (let i = 1; i <= 4; i++) {
+    const done = i < state.step;
+    const active = i === state.step;
+    const circleCls = done
+      ? 'bg-[#ec4899] text-white border-[#ec4899]'
+      : active
+        ? 'bg-white text-[#ec4899] border-[#ec4899] ring-4 ring-[#fdf2f8]'
+        : 'bg-white text-gray-400 border-gray-200';
+    parts.push(
+      '<button type="button" data-goto="' + i + '" ' + (i < state.step ? '' : 'disabled') +
+      ' class="group flex flex-1 items-center gap-2 sm:gap-3 text-left ' + (i < state.step ? 'cursor-pointer' : 'cursor-default') + '">' +
+        '<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-all duration-300 ' + circleCls + '">' +
+          (done ? checkSmall : i) +
+        '</span>' +
+        '<span class="hidden sm:block min-w-0">' +
+          '<span class="block text-[11px] uppercase tracking-wide ' + (active ? 'text-[#ec4899] font-bold' : done ? 'text-gray-500 font-semibold' : 'text-gray-400 font-medium') + '">Шаг ' + i + '</span>' +
+          '<span class="block truncate text-[13px] ' + (active ? 'font-bold text-[#1f2937]' : 'font-medium text-gray-500') + '">' + STEP_LABELS[i - 1] + '</span>' +
+        '</span>' +
+      '</button>'
+    );
+    if (i < 4) {
+      parts.push('<span class="mx-1 h-[2px] w-4 sm:w-8 shrink-0 rounded-full transition-colors duration-300 ' +
+        (i < state.step ? 'bg-[#ec4899]' : 'bg-gray-200') + '"></span>');
+    }
+  }
+  $('#stepper').innerHTML = '<div class="flex items-center">' + parts.join('') + '</div>';
+  $('#progress').style.width = ((state.step - 1) / 3 * 100) + '%';
+}
+
+/* ============================ шаг 1 ============================ */
+function step1HTML() {
+  return '<div class="fade-up">' +
+    '<h2 class="text-lg font-bold">Выберите услугу</h2>' +
+    '<p class="mt-1 text-sm text-gray-500">Цена и длительность указаны для базового варианта</p>' +
+    '<div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">' +
+      SERVICES.map(function (s) {
+        const active = state.service === s.id;
+        return '<button type="button" data-service="' + s.id + '" ' +
+          'class="group relative text-left rounded-[12px] border p-4 transition-all duration-200 ' +
+          'hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(31,41,55,0.09)] ' +
+          (active
+            ? 'border-[#ec4899] bg-[#fdf2f8] shadow-[0_8px_22px_rgba(236,72,153,0.18)]'
+            : 'border-gray-200 bg-white') + '">' +
+          '<div class="flex items-start gap-3">' +
+            '<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] transition-colors duration-200 ' +
+              (active ? 'bg-[#ec4899] text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200') + '">' +
+              svg(ICONS[s.icon], 'h-5 w-5') +
+            '</span>' +
+            '<span class="min-w-0 flex-1">' +
+              '<span class="block text-[15px] font-semibold leading-snug">' + s.name + '</span>' +
+              '<span class="mt-1 flex items-center gap-1.5 text-sm">' +
+                '<span class="font-bold ' + (active ? 'text-[#ec4899]' : 'text-[#1f2937]') + '">' + money(s.price) + '</span>' +
+                '<span class="text-gray-300">·</span>' +
+                '<span class="text-gray-500">' + s.mins + ' мин</span>' +
+              '</span>' +
+            '</span>' +
+            '<span class="shrink-0 text-[#ec4899] transition-opacity duration-200 ' + (active ? 'opacity-100' : 'opacity-0') + '">' + checkSmall + '</span>' +
+          '</div>' +
+        '</button>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+/* ============================ шаг 2 ============================ */
+function step2HTML() {
+  return '<div class="fade-up">' +
+    '<h2 class="text-lg font-bold">Выберите мастера</h2>' +
+    '<p class="mt-1 text-sm text-gray-500">Можно выбрать конкретного специалиста или довериться студии</p>' +
+    '<div class="no-scrollbar mt-5 flex gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible sm:pb-0">' +
+      MASTERS.map(function (m) {
+        const active = state.master === m.id;
+        return '<button type="button" data-master="' + m.id + '" ' +
+          'class="min-w-[136px] sm:min-w-0 flex-1 rounded-[12px] border p-4 text-center transition-all duration-200 ' +
+          'hover:-translate-y-0.5 hover:shadow-[0_8px_22px_rgba(31,41,55,0.09)] ' +
+          (active ? 'border-[#ec4899] bg-[#fdf2f8] shadow-[0_8px_22px_rgba(236,72,153,0.18)]' : 'border-gray-200 bg-white') + '">' +
+          '<span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br ' + m.grad +
+            ' text-lg font-bold text-white shadow-inner ' + (active ? 'ring-2 ring-[#ec4899] ring-offset-2' : '') + '">' + m.initials + '</span>' +
+          '<span class="mt-3 block text-[15px] font-semibold leading-tight">' + m.name + '</span>' +
+          '<span class="mt-0.5 block text-xs text-gray-500">' + m.role + '</span>' +
+          (m.rating
+            ? '<span class="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[#1f2937] shadow-sm ring-1 ring-gray-100">' +
+                svg(ICONS.star, 'h-3.5 w-3.5 text-amber-400', 2) + m.rating + '</span>'
+            : '<span class="mt-2 inline-flex items-center rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-400 ring-1 ring-gray-100">без предпочтений</span>') +
+        '</button>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+/* ============================ шаг 3 ============================ */
+function calendarHTML() {
+  const firstWeekday = (new Date(CAL.year, CAL.month, 1).getDay() + 6) % 7; // 0 = Пн
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push('<span></span>');
+  for (let d = 1; d <= DAYS_IN_MONTH; d++) {
+    const past = isPast(d);
+    const selected = state.day === d;
+    const today = isToday(d);
+    const free = SLOTS.length - busyCount(d);
+    const base = 'relative flex h-10 w-full flex-col items-center justify-center rounded-[10px] text-sm transition-all duration-200 ';
+    const cls = past
+      ? 'cursor-not-allowed text-gray-300'
+      : selected
+        ? 'bg-[#ec4899] font-bold text-white shadow-[0_6px_16px_rgba(236,72,153,0.35)]'
+        : 'font-medium text-[#1f2937] hover:bg-[#fdf2f8] hover:text-[#ec4899] cursor-pointer';
+    cells.push(
+      '<button type="button" ' + (past ? 'disabled' : 'data-day="' + d + '"') + ' class="' + base + cls + '" title="' +
+        (past ? 'Дата уже прошла' : dateLabel(d) + ' — свободно ' + free + ' из ' + SLOTS.length) + '">' +
+        d +
+        (today && !selected ? '<span class="absolute bottom-1 h-1 w-1 rounded-full bg-[#ec4899]"></span>' : '') +
+      '</button>'
+    );
+  }
+  return '<div class="rounded-[12px] border border-gray-200 p-4">' +
+    '<div class="flex items-center justify-between">' +
+      '<p class="text-sm font-bold">' + MONTHS[CAL.month] + ' ' + CAL.year + '</p>' +
+      '<span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">сегодня ' + TODAY.getDate() + ' ' + MONTHS_GEN[CAL.month] + '</span>' +
+    '</div>' +
+    '<div class="mt-3 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-400">' +
+      WEEKDAYS.map(function (w) { return '<span class="py-1">' + w + '</span>'; }).join('') +
+    '</div>' +
+    '<div class="mt-1 grid grid-cols-7 gap-1">' + cells.join('') + '</div>' +
+    '<div class="mt-3 flex items-center gap-4 border-t border-gray-100 pt-3 text-[11px] text-gray-500">' +
+      '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-[#ec4899]"></span> выбрано</span>' +
+      '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-gray-200"></span> есть свободные окна</span>' +
+      '<span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full border border-gray-200 bg-white"></span> прошедшая дата</span>' +
+    '</div>' +
+  '</div>';
+}
+
+function slotsHTML() {
+  if (!state.day) {
+    return '<div class="rounded-[12px] border border-dashed border-gray-200 p-6 text-center">' +
+      '<p class="text-sm font-semibold text-gray-500">Сначала выберите дату</p>' +
+      '<p class="mt-1 text-xs text-gray-400">После этого появятся свободные окна</p>' +
+    '</div>';
+  }
+  return '<div>' +
+    '<div class="flex items-baseline justify-between">' +
+      '<p class="text-sm font-bold">Свободное время</p>' +
+      '<p class="text-xs text-gray-400">' + dateLabel(state.day) + '</p>' +
+    '</div>' +
+    '<div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+      SLOTS.map(function (t, i) {
+        const busy = isBusy(state.day, i);
+        const active = state.slot === t;
+        if (busy) {
+          return '<button type="button" disabled ' +
+            'class="cursor-not-allowed rounded-[12px] border border-gray-100 bg-gray-50 px-2 py-2.5 text-center">' +
+            '<span class="block text-sm font-semibold text-gray-300 line-through">' + t + '</span>' +
+            '<span class="mt-0.5 block text-[10px] uppercase tracking-wide text-gray-300">занято</span>' +
+          '</button>';
+        }
+        return '<button type="button" data-slot="' + t + '" ' +
+          'class="rounded-[12px] border px-2 py-2.5 text-center transition-all duration-200 hover:-translate-y-0.5 ' +
+          (active
+            ? 'border-[#ec4899] bg-[#ec4899] text-white shadow-[0_6px_16px_rgba(236,72,153,0.35)]'
+            : 'border-gray-200 bg-white font-semibold text-[#1f2937] hover:border-[#ec4899] hover:text-[#ec4899] hover:shadow-[0_6px_16px_rgba(31,41,55,0.08)]') + '">' +
+          '<span class="block text-sm ' + (active ? 'font-bold' : '') + '">' + t + '</span>' +
+          '<span class="mt-0.5 block text-[10px] uppercase tracking-wide ' + (active ? 'text-white/80' : 'text-gray-400') + '">свободно</span>' +
+        '</button>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+function step3HTML() {
+  return '<div class="fade-up">' +
+    '<h2 class="text-lg font-bold">Выберите дату и время</h2>' +
+    '<p class="mt-1 text-sm text-gray-500">Слоты со статусом «занято» уже забронированы</p>' +
+    '<div class="mt-5 grid gap-5 md:grid-cols-2">' + calendarHTML() + slotsHTML() + '</div>' +
+  '</div>';
+}
+
+/* ============================ шаг 4 ============================ */
+function summaryRows() {
+  const s = byId(SERVICES, state.service);
+  const m = byId(MASTERS, state.master);
+  const rows = [
+    ['Услуга', s ? s.name : '—'],
+    ['Мастер', m ? (m.id === 'any' ? 'Любой свободный' : m.name + ' · ' + m.role) : '—'],
+    ['Дата и время', state.day && state.slot ? dateLabel(state.day) + ', ' + state.slot : '—'],
+    ['Длительность', s ? s.mins + ' мин' : '—']
+  ];
+  return rows.map(function (r) {
+    return '<div class="flex items-start justify-between gap-4 py-2.5">' +
+      '<span class="text-sm text-gray-500">' + r[0] + '</span>' +
+      '<span class="text-right text-sm font-semibold">' + r[1] + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function step4HTML() {
+  const s = byId(SERVICES, state.service);
+  return '<div class="fade-up">' +
+    '<h2 class="text-lg font-bold">Контактные данные</h2>' +
+    '<p class="mt-1 text-sm text-gray-500">Проверьте детали записи и оставьте контакты</p>' +
+
+    '<div class="mt-5 rounded-[12px] border border-pink-100 bg-[#fdf2f8] p-4">' +
+      '<div class="divide-y divide-pink-100">' + summaryRows() + '</div>' +
+      '<div class="mt-2 flex items-center justify-between border-t border-pink-200 pt-3">' +
+        '<span class="text-sm font-semibold text-[#1f2937]">Итого</span>' +
+        '<span class="text-xl font-extrabold text-[#ec4899]">' + (s ? money(s.price) : '—') + '</span>' +
+      '</div>' +
+      '<p class="mt-1 text-xs text-gray-500">Оплата в студии после услуги</p>' +
+    '</div>' +
+
+    '<div class="mt-5 grid gap-4 sm:grid-cols-2">' +
+      '<label class="block">' +
+        '<span class="mb-1.5 block text-sm font-semibold">Ваше имя</span>' +
+        '<input id="inpName" type="text" autocomplete="name" maxlength="40" placeholder="Например, Наташа" ' +
+          'value="' + state.name.replace(/"/g, '&quot;') + '" ' +
+          'class="w-full rounded-[12px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#ec4899] focus:ring-4 focus:ring-[#fdf2f8]">' +
+      '</label>' +
+      '<label class="block">' +
+        '<span class="mb-1.5 block text-sm font-semibold">Телефон</span>' +
+        '<input id="inpPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+7 (999) 123-45-67" ' +
+          'value="' + formatPhone(state.phone) + '" ' +
+          'class="w-full rounded-[12px] border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-gray-400 focus:border-[#ec4899] focus:ring-4 focus:ring-[#fdf2f8]">' +
+      '</label>' +
+    '</div>' +
+    '<p id="formHint" class="mt-2 hidden text-xs font-medium text-[#ec4899]">Укажите имя и телефон из 10 цифр</p>' +
+    '<p class="mt-3 text-xs text-gray-400">Нажимая «Записаться», вы соглашаетесь с правилами студии и обработкой персональных данных.</p>' +
+  '</div>';
+}
+
+/* ============================ навигация ============================ */
+function canGoNext() {
+  if (state.step === 1) return !!state.service;
+  if (state.step === 2) return !!state.master;
+  if (state.step === 3) return !!state.day && !!state.slot;
+  return state.name.trim().length >= 2 && state.phone.length === 10;
+}
+
+function renderNav() {
+  const ok = canGoNext();
+  const back = state.step > 1
+    ? '<button type="button" data-action="back" class="rounded-[12px] border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-[#1f2937] transition-all duration-200 hover:border-gray-300 hover:bg-gray-50">Назад</button>'
+    : '<span></span>';
+
+  const primary = state.step === 4
+    ? '<button type="button" data-action="submit" ' + (ok ? '' : 'disabled') +
+      ' class="w-full sm:w-auto rounded-[12px] px-8 py-3.5 text-base font-bold text-white transition-all duration-200 ' +
+      (ok
+        ? 'bg-[#ec4899] shadow-[0_10px_24px_rgba(236,72,153,0.35)] hover:-translate-y-0.5 hover:bg-[#db2777]'
+        : 'cursor-not-allowed bg-gray-200 text-gray-400 shadow-none') + '">Записаться</button>'
+    : '<button type="button" data-action="next" ' + (ok ? '' : 'disabled') +
+      ' class="w-full sm:w-auto rounded-[12px] px-8 py-3.5 text-base font-bold text-white transition-all duration-200 ' +
+      (ok
+        ? 'bg-[#ec4899] shadow-[0_10px_24px_rgba(236,72,153,0.3)] hover:-translate-y-0.5 hover:bg-[#db2777]'
+        : 'cursor-not-allowed bg-gray-200 text-gray-400 shadow-none') + '">Далее</button>';
+
+  const hint = state.step === 4
+    ? 'Шаг 4 из 4 · осталось подтвердить запись'
+    : (ok ? 'Всё выбрано — можно идти дальше' : 'Выберите вариант, чтобы продолжить');
+
+  $('#nav').innerHTML =
+    '<div class="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">' +
+      '<div class="flex items-center justify-between gap-3 sm:justify-start">' +
+        back +
+        '<p class="text-xs text-gray-400 sm:ml-2">' + hint + '</p>' +
+      '</div>' +
+      primary +
+    '</div>';
+}
+
+function renderPanel() {
+  const html = state.step === 1 ? step1HTML()
+    : state.step === 2 ? step2HTML()
+    : state.step === 3 ? step3HTML()
+    : step4HTML();
+  $('#panels').innerHTML = html;
+}
+
+function render() {
+  renderStepper();
+  renderPanel();
+  renderNav();
+}
+
+/* ============================ экран подтверждения ============================ */
+function renderSuccess() {
+  const s = byId(SERVICES, state.service);
+  const m = byId(MASTERS, state.master);
+  const masterText = m && m.id !== 'any' ? 'Мастер ' + m.name : 'Мастер подберётся из свободных';
+  const rows = [
+    ['Услуга', s.name],
+    ['Мастер', m.id === 'any' ? 'Любой свободный' : m.name + ' · ' + m.role],
+    ['Дата', dateLabel(state.day)],
+    ['Время', state.slot + ' · ' + s.mins + ' мин'],
+    ['Стоимость', money(s.price)],
+    ['Клиент', state.name.trim() + ', ' + formatPhone(state.phone)]
+  ];
+
+  $('#app').innerHTML =
+    '<div class="pop px-5 py-10 text-center sm:px-10 sm:py-14">' +
+      '<div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#fdf2f8]">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8 text-[#ec4899]"><path class="check-draw" d="M20 6L9 17l-5-5"/></svg>' +
+      '</div>' +
+      '<h2 class="mt-5 text-2xl font-extrabold sm:text-3xl">Вы записаны!</h2>' +
+      '<p class="mx-auto mt-2 max-w-md text-sm text-gray-500">' + masterText + '. Ждём вас ' + dateLabel(state.day) + ' в ' + state.slot + '.</p>' +
+      '<div class="mx-auto mt-6 max-w-md divide-y divide-gray-100 rounded-[12px] border border-gray-200 bg-white px-5 text-left">' +
+        rows.map(function (r) {
+          return '<div class="flex items-start justify-between gap-4 py-3">' +
+            '<span class="text-sm text-gray-500">' + r[0] + '</span>' +
+            '<span class="text-right text-sm font-semibold">' + r[1] + '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+      '<div class="mx-auto mt-6 flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">' +
+        '<button type="button" data-action="ics" class="rounded-[12px] border border-gray-200 bg-white px-5 py-3 text-sm font-semibold transition-all duration-200 hover:border-gray-300 hover:bg-gray-50">Добавить в календарь</button>' +
+        '<button type="button" data-action="restart" class="rounded-[12px] bg-[#ec4899] px-5 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(236,72,153,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#db2777]">Новая запись</button>' +
+      '</div>' +
+      '<p class="mt-5 text-xs text-gray-400">SMS с подтверждением отправлено на ' + formatPhone(state.phone) + '</p>' +
+    '</div>';
+}
+
+function downloadIcs() {
+  const s = byId(SERVICES, state.service);
+  const [h, mi] = state.slot.split(':').map(Number);
+  const start = new Date(CAL.year, CAL.month, state.day, h, mi);
+  const end = new Date(start.getTime() + s.mins * 60000);
+  const stamp = (d) => d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' + pad(d.getHours()) + pad(d.getMinutes()) + '00';
+  const m = byId(MASTERS, state.master);
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Forma Studio//Booking//RU', 'BEGIN:VEVENT',
+    'UID:' + Date.now() + '@forma-studio',
+    'DTSTART:' + stamp(start), 'DTEND:' + stamp(end),
+    'SUMMARY:' + s.name + ' — студия «Форма»',
+    'LOCATION:ул. Ленина, 12',
+    'DESCRIPTION:Мастер: ' + (m && m.id !== 'any' ? m.name : 'любой свободный') + '\\nТелефон: ' + formatPhone(state.phone),
+    'END:VEVENT', 'END:VCALENDAR'
+  ].join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'zapis-' + dateKey(state.day) + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ============================ события ============================ */
+document.addEventListener('click', function (e) {
+  const t = e.target.closest('[data-service],[data-master],[data-day],[data-slot],[data-goto],[data-action]');
+  if (!t) return;
+
+  if (t.dataset.service) { state.service = t.dataset.service; render(); return; }
+  if (t.dataset.master)  { state.master = t.dataset.master; render(); return; }
+  if (t.dataset.day) {
+    const d = Number(t.dataset.day);
+    if (d !== state.day) state.slot = null;
+    state.day = d;
+    render();
+    return;
+  }
+  if (t.dataset.slot) { state.slot = t.dataset.slot; render(); return; }
+  if (t.dataset.goto) { state.step = Number(t.dataset.goto); render(); return; }
+
+  const action = t.dataset.action;
+  if (action === 'next') { if (canGoNext()) { state.step++; render(); } return; }
+  if (action === 'back') { state.step--; render(); return; }
+  if (action === 'submit') {
+    if (!canGoNext()) {
+      const hint = $('#formHint');
+      if (hint) hint.classList.remove('hidden');
+      return;
+    }
+    renderSuccess();
+    return;
+  }
+  if (action === 'restart') {
+    state.step = 1; state.service = null; state.master = null;
+    state.day = null; state.slot = null; state.name = ''; state.phone = '';
+    location.reload();
+    return;
+  }
+  if (action === 'ics') { downloadIcs(); return; }
+});
+
+document.addEventListener('input', function (e) {
+  if (e.target.id === 'inpName') {
+    state.name = e.target.value;
+    renderNav();
+    if (state.name.trim().length >= 2) $('#formHint') && $('#formHint').classList.add('hidden');
+  }
+  if (e.target.id === 'inpPhone') {
+    const d = phoneDigits(e.target.value);
+    state.phone = d;
+    const formatted = formatPhone(d);
+    if (formatted !== e.target.value) e.target.value = formatted;
+    renderNav();
+    if (d.length === 10) $('#formHint') && $('#formHint').classList.add('hidden');
+  }
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter') return;
+  if (state.step < 4 && e.target.tagName !== 'INPUT' && canGoNext()) { state.step++; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
